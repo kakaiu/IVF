@@ -75,7 +75,7 @@ for item in tmp_layout.find():
 	item.pop('size')
 	item['colorID'] = color_table[item['color']]
 	item.pop('color')
-	result['object'].append([0, 1, item])
+	result['object'].append([0, 1, item]) ##change
 	tmp_id_list.append(item['id'])
 	tmp_desc_dict[item['id']] = getDesc(item['id'])
 
@@ -89,7 +89,7 @@ for tmp_id in tmp_id_list:
 	if len(lines)>0:
 		result['interaction'].append([tmp_id, [1,[[1,tmp_desc_dict[tmp_id]],[2,3],[3,[]],[4,lines]]] ]) #{'pick':[dowhat[1, 2]]}
 	else:
-		result['interaction'].append([tmp_id, [1,[[1,tmp_desc_dict[tmp_id]],[2,3]]] ])
+		result['interaction'].append([tmp_id, [ 1,[ [1,tmp_desc_dict[tmp_id]], [2,3]] ] ])
 
 result['operationTable'][1] = 'pick'
 result['reactionTable'][1] = 'infoDisplay'

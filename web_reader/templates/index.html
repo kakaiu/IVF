@@ -193,34 +193,30 @@
             reactionTable = vRaw;
         }
 
-        function loadParticleSystem(ifPresented, vRaw) { 
+        function loadParticleSystem(vRaw) { 
             var vData = new Object();
-            vData.id = vRaw['id'];          
-            vData.color = colorTable[vRaw['colorID']];
-            vData.x = vRaw['x'];
-            vData.y = vRaw['y'];
-            vData.z = vRaw['z'];  
-            vData.w = vRaw['w'];
-            vData.description =  vRaw['description'];
-            vData.ifPresented = ifPresented;
+            vData.id = vRaw[0];      
+            vData.ifPresented = ifPresented;   
+            vData.x = vRaw[3];
+            vData.y = vRaw[4];
+            vData.z = vRaw[5];
+            vData.w = vRaw[6];  
+            vData.color = colorTable[vRaw[7]];
             particleSystem.push(vData); //TODO particleSystemDict
         }
 
         function loadLineSystem(ifPresented, vRaw) {
             lineDict[vRaw[0]] = [vRaw[1], vRaw[2]];
-            if (ifPresented==1) {
-                generateLine(); //TODO
-            }
         }
 
 
         function loadObject(obj_list) {
             for (var i=0; i<obj_list.length; i++) {
-                if (obj_list[i][0]==0) { //particle Dict
-                    loadParticleSystem(obj_list[i][1], obj_list[i][2]);
+                if (obj_list[i][1]==0) { //particle Dict
+                    loadParticleSystem(obj_list[i]);
 
-                } else if (obj_list[i][0]==1) { //line Dict
-                    loadLineSystem(obj_list[i][1], obj_list[i][2]);
+                } else if (obj_list[i][1]==1) { //line Dict
+                    loadLineSystem(obj_list[i]);
 
                 } else {
                     console.warn("IVF obj error, which should not be presented!");
