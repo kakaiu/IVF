@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>IVF Reader</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+        <link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
+        <script src="/static/jquery/1.11.3/jquery.min.js"></script>
+        <script src="/static/bootstrap/js/bootstrap.js"></script>
+
+        <style>
+            body {
+                background-color: #000000;
+                margin: 0px;
+                overflow: hidden;
+            }
+
+            p, h2 {
+                color: #ffffff;
+            }
+
+        </style>
+    </head>
+
+    <body>
+    <nav class="navbar navbar-default navbar-static-top">
+          <div class="container">
+            <form class="navbar-form navbar-left" role="search">
+              <div class="form-group">
+                <input type="file" id="file">
+              </div>
+            </form>
+            <button id="readFile" class="btn btn-default" onclick="readFile(this.files);">Submit</button>
+          </div>
+        </nav>
+        <div class="row">
+            <div id="view" class="col-lg-9"></div>
+            <div class='col-lg-3'>
+            <div id="info" class="media" style="background:#000; opacity:0.8;">
+              <div class="media-body" id = "infoMediaBody">
+                <h2 class="media-heading" id = "title"></h2>
+                <p id = "description"></p>
+              </div>
+            </div>
+        </div>
+
+        <script src="/static/three.js/build/three.min.js"></script>
+        <script src="/static/three.js/js/Detector.js"></script>
+        <script src="/static/three.js/js/controls/TrackballControls.js"></script>
+        <script type="x-shader/x-vertex" id="vertexshader">
+            uniform float amplitude;
+            attribute float size;
+            attribute vec3 customColor;
+            varying vec3 vColor;
+            void main() {
+                vColor = customColor;
+                vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+                gl_PointSize = size * ( 500.0 / length( mvPosition.xyz ) );
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        </script>
+        <script type="x-shader/x-fragment" id="fragmentshader">
+            uniform vec3 color;
+            uniform sampler2D texture;
+            varying vec3 vColor;
+            void main() {
+                gl_FragColor = vec4( color * vColor, 1.0 );
+                gl_FragColor = gl_FragColor * texture2D( texture, gl_PointCoord );
+            }
+        </script>
+
+        <script> 
+        function refreshFrame() {
+            renderer.render( scene, camera );
+        }  
+
+        var currentLineList = []
+        function removeLines(keepList) {
+            if ( currentLineList.length > 0 ) {
+                for (var i=0; i<currentLineList.length; i++) {
+                    if (keepList.indexOf(currentLineList[i])==-1) {
+                        var tmp = scene.getObjectByName(currentLineList[i]);
+                    }
+                    scene.remove(tmp);
+                }
+                scene.needsUpdate = true;
+                refreshFrame();
+            }
+        }
+        function addToLineList( id ) {
+            if (currentLineList.indexOf(id)==-1) {
+                currentLineList.push( id );
+            }
+        }
+
+
+        showingID = -1;   
+        var nodeInfo = new Object();
+        function infoPanel( id, info ) {
+            if ( id != showingID ) {
+                var selectedRaw = particleSystem[ id ];
+                infoTitle       = document.getElementById("title");
+                infoDescription = document.getElementById("description");
+                //infoTitle.innerHTML = selectedRaw.id;
+                infoDescription.innerHTML = info;
+                showingID = id;
+            }
+        }
+
+        function generateLine(fromX,fromY,fromZ, toX,toY,toZ) {
+            var lPositions = new Float32Array( 6 );
+            var vertex = new THREE.Vector3();
+            vertex.x = fromX;
+            vertex.y = fromY;
+            vertex.z = fromZ-0.001; //for eliminate the bad situation when we pick nodes beneath lines
+            vertex.toArray( lPositions, 0 );
+
+            vertex.x = toX;
+            vertex.y = toY;
+            vertex.z = toZ-0.001; //for eliminate the bad situation when we pick nodes beneath lines
+            vertex.toArray( lPositions, 3 );
+
+            var lGeometry = new THREE.BufferGeometry();
+            lGeometry.addAttribute( 'position', new THREE.BufferAttribute( lPositions, 3 ) );
+
+            var lMaterial = new THREE.LineBasicMaterial( {
+                color: 0x999999,
+                linewidth: 1.5
+            } );
+
+            var linesMesh = new THREE.LineSegments( lGeometry, lMaterial );
+
+            delete lGeometry;
+            delete lMaterial;
+            delete lPositions;
+            delete vertex;
+
+            return linesMesh;
+        }
+
+        function generateParticle() {
+            var amount = particleSystem.length;
+            var positions = new Float32Array( amount * 3 );
+            var colors = new Float32Array( amount * 3 );
+            var sizes = new Float32Array( amount );
+            var vertex = new THREE.Vector3();
+            var color = new THREE.Color( 0xffffff );
+            for ( var i = 0; i < amount; i ++ ) {
+                if (particleSystem[i].ifPresented==1) {
+                    vertex.x = particleSystem[i].x;
+                    vertex.y = particleSystem[i].y;
+                    vertex.z = particleSystem[i].z;
+                    vertex.toArray( positions, i * 3 );
+                    color.setHex( particleSystem[i].color );
+                    color.toArray( colors, i * 3 );
+                    sizes[ i ] = particleSystem[i].w;
+                    console.warn(1);
+                }
+            }
+            var geometry = new THREE.BufferGeometry();
+            geometry.addAttribute( 'position', new THREE.BufferAttribute( positions, 3 ) );
+            geometry.addAttribute( 'customColor', new THREE.BufferAttribute( colors, 3 ) );
+            geometry.addAttribute( 'size', new THREE.BufferAttribute( sizes, 1 ) );
+            //
+            var material = new THREE.ShaderMaterial( {
+                uniforms: {
+                    amplitude: { type: "f", value: 2.0 },
+                    color:     { type: "c", value: new THREE.Color( 0xffffff ) },
+                    texture:   { type: "t", value: THREE.ImageUtils.loadTexture( "/static/three.js/textures/sprites/disc.png" ) }
+                },
+                vertexShader:   document.getElementById( 'vertexshader' ).textContent,
+                fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+                blending:       THREE.AdditiveBlending,
+                depthTest:      false,
+                transparent:    true
+            });
+            //
+            sphere = new THREE.Points( geometry, material );
+            scene.add( sphere );
+            APP_STATUS = 1;
+        }
+
+        function loadColorTable(vRaw) {
+            colorTable = vRaw;
+        }
+
+        function loadOperationTable(vRaw) {
+            operationTable = vRaw;
+        }
+
+        function loadReactionTable(vRaw) {
+            reactionTable = vRaw;
+        }
+
+        function loadParticleSystem(ifPresented, vRaw) { 
+            var vData = new Object();
+            vData.id = vRaw['id'];          
+            vData.color = colorTable[vRaw['colorID']];
+            vData.x = vRaw['x'];
+            vData.y = vRaw['y'];
+            vData.z = vRaw['z'];  
+            vData.w = vRaw['w'];
+            vData.description =  vRaw['description'];
+            vData.ifPresented = ifPresented;
+            particleSystem.push(vData); //TODO particleSystemDict
+        }
+
+        function loadLineSystem(ifPresented, vRaw) {
+            lineDict[vRaw[0]] = [vRaw[1], vRaw[2]];
+            if (ifPresented==1) {
+                generateLine(); //TODO
+            }
+        }
+
+
+        function loadObject(obj_list) {
+            for (var i=0; i<obj_list.length; i++) {
+                if (obj_list[i][0]==0) { //particle Dict
+                    loadParticleSystem(obj_list[i][1], obj_list[i][2]);
+
+                } else if (obj_list[i][0]==1) { //line Dict
+                    loadLineSystem(obj_list[i][1], obj_list[i][2]);
+
+                } else {
+                    console.warn("IVF obj error, which should not be presented!");
+                }
+            }
+            generateParticle();
+        }
+
+        function loadInteraction(vRaw) {
+            for (var i=0; i<vRaw.length; i++) {
+                var tmp_id = vRaw[i][0]
+                var tmp_interaction = vRaw[i][1]
+
+                if (operationTable[tmp_interaction[0]]=='pick') {
+                    pickResponseTable[tmp_id] = tmp_interaction[1];
+                }
+            }
+        }
+
+        function readFile() {
+            var files = document.getElementById('file').files;
+            if (files.length) {
+                var reader = new FileReader();
+                reader.readAsText(files[0], "UTF-8");
+                reader.onload = function(evt){ 
+                    var fileString = evt.target.result;
+                    var raw_data = JSON.parse(fileString);
+                    loadColorTable(raw_data['colorTable']);
+                    loadOperationTable(raw_data['operationTable']);
+                    loadReactionTable(raw_data['reactionTable']);
+                    loadObject(raw_data['object']);
+                    loadInteraction(raw_data['interaction']);
+                }
+            }
+        }
+
+        function init() {
+            camera = new THREE.PerspectiveCamera( 40, WIDTH / HEIGHT, 1, 10000000 );
+            camera.position.z = 1000;
+            controls = new THREE.TrackballControls( camera );
+            controls.rotateSpeed = 10.0;
+            controls.zoomSpeed = 1.2;
+            controls.panSpeed = 0.8;
+            controls.noZoom = false;
+            controls.noPan = false;
+            controls.staticMoving = false;
+            controls.dynamicDampingFactor = 0.3;
+            controls.keys = [ 65, 83, 68 ];
+            controls.addEventListener( 'change', render );
+            scene = new THREE.Scene();
+            //
+            renderer = new THREE.WebGLRenderer();
+            renderer.setPixelRatio( window.devicePixelRatio );
+            renderer.setSize( WIDTH, HEIGHT );
+            var view = document.getElementById( 'view' );
+            view.appendChild( renderer.domElement );
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            //
+            window.addEventListener( 'resize', onWindowResize, false );
+            document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+        }
+
+        function onDocumentMouseMove( event ) {
+            event.preventDefault();
+            mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+            mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1 + 0.2; //0.2 is for the compensation
+        }
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            controls.handleResize();
+            renderer.setSize( window.innerWidth, window.innerHeight );
+        }
+        function animate() {
+            requestAnimationFrame( animate );
+            render();
+            controls.update();
+        }
+
+        function resetSizeChange() {
+            var attributes = sphere.geometry.attributes;
+            for ( var i = 0; i < attributes.size.array.length; i++ ) {
+                attributes.size.array[ i ] = particleSystem[ i ].w;
+            }
+            attributes.size.needsUpdate = true;
+        }   
+
+        function getPickReactions(id) {
+            if (pickResponseTable[id]!=undefined) {
+                return pickResponseTable[id];
+            } else {
+                return []
+            }
+        } 
+
+        function pick() {
+            var attributes = sphere.geometry.attributes;
+                //
+            raycaster.setFromCamera( mouse, camera );
+            var intersects = raycaster.intersectObject( sphere );
+                
+            if ( intersects.length > 0 ) {              
+                if ( INTERSECTED != intersects[ 0 ].index ) {
+                    INTERSECTED = intersects[ 0 ].index; 
+                }   
+                var reactionList = getPickReactions(particleSystem[INTERSECTED].id);
+                for (var i=0; i<reactionList.length; i++){
+                    if (reactionTable[reactionList[i][0]]=='infoDisplay') {
+                        infoPanel( INTERSECTED, reactionList[i][1] )
+                    } else if ((reactionTable[reactionList[i][0]]=='enlarge')) {
+                        attributes.size.array[ INTERSECTED ] = particleSystem[ INTERSECTED ].w*reactionList[i][1];
+
+                    } else if ((reactionTable[reactionList[i][0]]=='keepLine')) {
+                        removeLines(reactionList[i][1]);
+
+                    } else if ((reactionTable[reactionList[i][0]]=='appearLine')) {
+                        for (var j=0; j<reactionList[i][1].length; j++) {
+                            var tmp = lineDict[reactionList[i][1][j]];
+                            var f = tmp[0];
+                            var t = tmp[1];
+                            addToLineList(reactionList[i][1][j]);
+                            var tmp_geoLine = generateLine(f[0],f[1],f[2],t[0],t[1],t[2]);
+                            tmp_geoLine.name = reactionList[i][1][j];
+                            scene.add( tmp_geoLine );
+                        }
+                    }
+                }
+
+            } else {
+                if ( INTERSECTED !== null ) {
+                    INTERSECTED = null;
+                }               
+            }
+            attributes.size.needsUpdate = true;
+        }
+        
+        function render() {
+            if (APP_STATUS==1) {
+                resetSizeChange();
+                pick();
+                refreshFrame();
+            }
+        }
+
+        if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+        var renderer, scene, camera, raycaster;
+        var mouse, INTERSECTED
+        var particleSystem = new Array();
+        var lineDict = new Object();
+        var colorTable = new Object();
+        var operationTable = new Object();
+        var reactionTable = new Object();
+        var pickResponseTable = new Object();
+        var sphere;
+        var linesMesh;
+        var lineTag = new Array();
+        var noise = [];
+        var WIDTH = window.innerWidth;
+        var HEIGHT = window.innerHeight;
+        var APP_STATUS = 0
+
+        init();
+        animate();
+
+    </script>
+</body>
+</html>
