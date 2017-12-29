@@ -1,22 +1,23 @@
 import json, os
 
 class ivf_writer:
-	__data_structure = None
+	__data_structure = dict()
+	__data_structure['object'] = []
+	__data_structure['interaction'] = []
+	__data_structure['operationTable'] = dict()
+	__data_structure['reactionTable'] = dict()
+	__data_structure['colorTable'] = dict()
 	__currentID = -1
 	__currentIDFreeCache = []
 	__idTable = dict()
 
 	def init(self):
-		self.__data_structure = dict()
-		self.__data_structure['object'] = []
-		self.__data_structure['interaction'] = []
-		self.__data_structure['operationTable'] = dict()
-		self.__data_structure['reactionTable'] = dict()
-		self.__data_structure['colorTable'] = dict()
+		pass
 
-	def setObject(self, groupID, object): #id, [type 0 is particle, if immediately appear, {w,x,y,z, colorID}]
+	def setObject(self, groupID, objectItem): #id, [type 0 is particle, if immediately appear, {w,x,y,z, colorID}]
 		self.__currentID = self.__currentID + 1
-		self.__data_structure['object'].append([self.__currentID].extend(object))
+
+		self.__data_structure['object'].append([self.__currentID]+objectItem)
 		if self.__idTable.has_key(groupID):
 			self.__idTable[groupID].append(self.__currentID)
 		else:
@@ -33,7 +34,7 @@ class ivf_writer:
 						return tmpIDs
 
 					if self.__data_structure['object'][i][0]==tmpID:
-						self.__data_structure['object'][i] = [tmpID].extend(newObject)
+						self.__data_structure['object'][i] = [tmpID]+newObject
 						modifiedList.append(self.__data_structure['object'][i][0])
 		return modifiedList
 
@@ -41,7 +42,7 @@ class ivf_writer:
 		if self.__idTable.has_key(groupID): #tmpID1 != (group1 && group2)
 			tmpIDs = self.__idTable[groupID]
 			for tmpID in tmpIDs:
-				self.__data_structure['interaction'].append([tmpID].append(interactions))
+				self.__data_structure['interaction'].append([tmpID, interactions])
 
 	def modifyInteraction(self, groupID, newInteractions):
 		modifiedList = []
@@ -53,7 +54,7 @@ class ivf_writer:
 						return tmpIDs
 
 					if self.__data_structure['interaction'][i][0]==tmpID:
-						self.__data_structure['interaction'][i] = [tmpID].append(newInteractions)
+						self.__data_structure['interaction'][i] = [tmpID, newInteractions]
 						modifiedList.append(self.__data_structure['interaction'][i][0])
 
 	def setOperationTable(self, operationTable):
@@ -67,4 +68,4 @@ class ivf_writer:
 
 	def write(self, output_path='data.ivf'):
 		with open(output_path, 'w') as json_file:
-        	json_file.write(json.dumps(self.__data_structure))
+			json_file.write(json.dumps(self.__data_structure))

@@ -30,7 +30,7 @@ for item in tmp_layout.find():
 
 
 iw.setColorTable(dict(zip(color_table.values(),color_table.keys())))
-iw.setInteraction(0, [1,[ [1,tmp_desc_dict[tmp_id]], [2,3]]])
+iw.setInteraction(0, [1,[ [1,'I am repo'], [2,3]]])
 iw.setOperationTable({1:'pick'})
 iw.setReactionTable({1:'infoDisplay', 2:'enlarge'})
 
